@@ -1,0 +1,178 @@
+这份 `docker-compose.yaml` 可以理解为：用一份配置文件，一次性启动掌柜问数需要的 5 个服务。
+
+## 一、先看整体结构
+
+```
+docker-compose.yaml
+│
+├── services（要启动哪些服务）
+│   │
+│   ├── mysql             存储数据库元数据、业务信息
+│   │
+│   ├── elasticsearch     检索商品名、地区等字段取值
+│   │
+│   ├── kibana            Elasticsearch 可视化管理界面
+│   │
+│   ├── qdrant            存储、检索语义向量
+│   │
+│   └── embedding         把文字转换成向量
+│
+└── volumes（数据保存在哪里）
+    │
+    ├── mysql_data        保存 MySQL 数据
+    ├── es_data           保存 Elasticsearch 数据
+    └── qdrant_data       保存 Qdrant 数据
+```
+
+## 二、每个服务里面的配置是什么意思？
+
+以 MySQL 为例：
+
+```
+mysql:
+  image: mysql:8.0
+  container_name: wenshu-mysql
+  restart: unless-stopped
+  environment:
+    MYSQL_ROOT_PASSWORD: Atguigu.123
+  ports:
+    - "3307:3306"
+  volumes:
+    - mysql_data:/var/lib/mysql
+```
+
+对应关系：
+
+```
+mysql
+ │
+ ├── image
+ │    └── 使用哪个镜像：MySQL 8.0
+ │
+ ├── container_name
+ │    └── 容器叫什么：wenshu-mysql
+ │
+ ├── restart
+ │    └── 异常退出自动重启
+ │        手动停止后不会自动重启
+ │
+ ├── environment
+ │    └── 给容器设置环境变量（例如密码）
+ │
+ ├── ports
+ │    └── Mac 的 3307 → 容器的 3306
+ │
+ └── volumes
+      └── 数据保存到 Docker 数据卷
+```
+
+其他服务也是类似的配置方式。
+
+## 三、五个服务分别做什么？
+
+```
+用户提问：
+"去年苹果手机销售额多少？"
+           │
+           ▼
+     掌柜问数 Python 后端
+           │
+           ├── MySQL
+           │    查询表结构、指标定义
+           │
+           ├── Embedding
+           │    文字 → 1024维向量
+           │             │
+           │             ▼
+           ├── Qdrant
+           │    检索相关业务知识
+           │
+           ├── Elasticsearch
+           │    查找真实字段取值
+           │    例如：苹果手机 → iPhone
+           │
+           ▼
+      LLM 生成 SQL
+           │
+           ▼
+      业务数据库执行
+           │
+           ▼
+        返回结果
+
+
+Kibana ──► 管理、查看 Elasticsearch
+```
+
+注意：LLM 和 Python 后端不在你这份 Compose 的五个服务里，需要另外启动。
+
+## 四、几个特殊配置
+
+1\. `build` 和 `image` 的区别
+
+```
+image: mysql:8.0
+```
+
+直接使用已有镜像。
+
+```
+build: ./elasticsearch
+```
+
+按照 `elasticsearch/` 文件夹中的 Dockerfile 自己构建镜像。老师这样做是为了安装 IK 中文分词插件。
+
+2\. `ports` 的两个数字
+
+```
+ports:
+  - "3307:3306"
+```
+
+```
+Mac 电脑                   Docker 容器
+
+localhost:3307  ────────►  mysql:3306
+     ↑                         ↑
+  外部访问端口               容器内部端口
+```
+
+3\. `volumes` 的两种写法
+
+```
+- mysql_data:/var/lib/mysql
+```
+
+把数据库数据放到 Docker 管理的数据卷里，容器删除后数据卷通常仍在。
+
+```
+- ./mysql:/docker-entrypoint-initdb.d
+```
+
+把 Mac 当前目录下的 `mysql` 文件夹挂载到容器中，用来放初始化 SQL 脚本。MySQL 官方镜像一般只在数据库数据目录首次初始化时执行这些脚本。
+
+4\. `depends_on`
+
+```
+depends_on:
+  - elasticsearch
+```
+
+表示 Kibana 要在 Elasticsearch 容器启动之后再启动，但不保证 Elasticsearch 已经完全准备好。
+
+## 五、一句话记住 Docker Compose
+
+```
+image        → 用什么软件
+build        → 怎么自己制作镜像
+container_name → 容器叫什么
+ports        → 对外开放哪个端口
+environment  → 软件需要什么参数
+volumes      → 数据保存在哪里
+restart      → 什么时候自动重启
+depends_on   → 谁先启动
+```
+
+Docker Compose 本质上就是一份“容器启动说明书”。
+
+`services` 决定启动什么，`ports` 决定怎么访问，`environment` 决定怎么配置，`volumes` 决定数据怎么持久保存。
