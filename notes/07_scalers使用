@@ -1,0 +1,83 @@
+对！你理解的方向是正确的。
+
+`result.scalars()` 的作用，就是把 SQLAlchemy 查询结果中的 `Row` 包装去掉，直接取每一行的第一列。
+
+关键是：你这里第一列恰好是一个 `TableInfoMySQL` ORM 实例。
+
+## 一、先看不用 scalars() 的情况
+
+```
+result = await session.execute(    select(TableInfoMySQL).limit(2))table_infos = result.all()
+```
+
+结果大致是：
+
+```
+[
+    Row(TableInfoMySQL对象1),
+    Row(TableInfoMySQL对象2)
+]
+```
+
+结构图：
+
+```
+result.all()
+    │
+    ▼
+list
+ ├── Row
+ │    └── TableInfoMySQL对象1
+ │
+ └── Row
+      └── TableInfoMySQL对象2
+```
+
+每个元素是 `Row`，虽然里面装着 ORM 对象，但外面还包了一层。
+
+## 二、用了 scalars() 之后
+
+```
+table_infos = result.scalars().all()
+```
+
+结果变成：
+
+```
+[
+    TableInfoMySQL对象1,
+    TableInfoMySQL对象2
+]
+```
+
+结构图：
+
+```
+result.scalars().all()
+    │
+    ▼
+list
+ ├── TableInfoMySQL对象1
+ └── TableInfoMySQL对象2
+```
+
+所以现在可以直接：
+
+```
+for table in table_infos:    print(table.table_name)    print(table.description)
+```
+
+前提是 ORM 模型中确实定义了这些属性。
+
+## 三、但注意一个特别重要的区别
+
+`scalars()` 永远取每行的第一列（默认），而不是永远返回 ORM 对象。
+
+看三种情况：
+
+| SQLAlchemy 查询                                    | `result.all()`     | `result.scalars().all()` |
+| ------------------------------------------------ | ------------------ | ------------------------ |
+| `select(TableInfoMySQL)`                         | `Row(ORM对象)`       | ORM对象                    |
+| `select(TableInfoMySQL.name)`                    | `Row("orders")`    | `"orders"`               |
+| `select(TableInfoMySQL.id, TableInfoMySQL.name)` | `Row(1, "orders")` | `1`                      |
+
