@@ -1,11 +1,12 @@
 import asyncio
 from typing import Optional
 
-from sqlalchemy import text
+from sqlalchemy import text, Select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncEngine, async_sessionmaker
 from sqlalchemy.ext.asyncio.session import AsyncSession
 
 from app.conf.app_config import DBConfig, app_config
+from app.models.mysql.table_info_mysql import TableInfoMySQL
 
 
 class MysqlClientManager:
@@ -33,12 +34,11 @@ class MysqlClientManager:
                                           )
 
         self.session_factory = async_sessionmaker(bind=self.client,
-                                            autoflush=True,
-                                            # 自动刷新未提交的的更新到暂存区
-                                            # 后查询会看到未提交(事务)的数据
-                                            autobegin=True  # 自动开启事务，需要手动提交或者回滚事务
-                                            )
-
+                                                  autoflush=False,
+                                                  # 自动刷新未提交的的更新到暂存区
+                                                  # 后查询会看到未提交(事务)的数据
+                                                  autobegin=True  # 自动开启事务，需要手动提交或者回滚事务
+                                                  )
 
     async def close_client(self):
         await self.client.dispose()
@@ -51,7 +51,7 @@ meta_mysql_client_manager = MysqlClientManager(app_config.db_meta)
 
 if __name__ == '__main__':
     # 测试查询dw库中的dim_customer表中的数据
-    async def test():
+    async def test_session():
         # 初始化客户端
         dw_mysql_client_manager.init_client(app_config.db_dw)
         # 利用客户端查询数据表数据
@@ -96,6 +96,7 @@ if __name__ == '__main__':
         # 关闭客户端
         await dw_mysql_client_manager.close_client()
 
+
     # 测试查询dw库中的dim_customer表中的数据
     async def test_session_factory():
         # 初始化客户端
@@ -139,5 +140,78 @@ if __name__ == '__main__':
         await dw_mysql_client_manager.close_client()
 
 
-    # asyncio.run(test())
-    asyncio.run(test_session_factory())
+    # 测试ORM操作：添加和查询
+    # 测试meta库中的 table_info表
+    async def test_orm_get_and_add():
+        # 初始化客户端
+        meta_mysql_client_manager.init_client(app_config.db_meta)
+        # 创建session
+        assert meta_mysql_client_manager.session_factory
+        async with meta_mysql_client_manager.session_factory() as session:
+            # 添加一条数据
+            table_info1 = TableInfoMySQL(
+                id='dim_customer1',
+                name='dim_customer1',
+                role='dim',
+                description='客户信息表'
+            )
+
+            session.add(table_info1)
+            # 添加多条数据
+            table_info2 = TableInfoMySQL(
+                id='dim_customer2',
+                name='dim_customer2',
+                role='dim',
+                description='客户信息表'
+            )
+            table_info3 = TableInfoMySQL(
+                id='dim_customer3',
+                name='dim_customer3',
+                role='dim',
+                description='客户信息表'
+            )
+            session.add_all([table_info2, table_info3])
+
+            # 查询一条数据
+            table_info = await session.get(TableInfoMySQL, table_info1.id)
+            print(table_info, table_info.description)
+
+            # 查询多条数据
+            result = await session.execute(Select(TableInfoMySQL).limit(2))
+            # table_infos = result.all() #[row,row]
+            table_infos: list[TableInfoMySQL] = result.scalars().all()  # [row,row]
+            print(table_infos, type(table_infos[0]))
+
+            # 提交事务
+            await session.commit()
+
+        # 等待客户端关闭
+        await meta_mysql_client_manager.close_client()
+
+
+    # 测试ORM操作：更新和删除
+    # 测试meta库中的 table_info表
+    async def test_orm_delete_and_update():
+        # 初始化客户端
+        meta_mysql_client_manager.init_client(app_config.db_meta)
+        # 创建session
+        assert meta_mysql_client_manager.session_factory
+        async with meta_mysql_client_manager.session_factory() as session:
+            # 更新
+            table_info = await session.get(TableInfoMySQL, 'dim_customer1')
+            table_info.description = 'aaa'
+
+            #删除
+            await session.delete(table_info)
+            # 提交事务
+            await session.commit()
+
+
+        # 等待客户端关闭
+        await meta_mysql_client_manager.close_client()
+
+
+    # asyncio.run(test_session())
+    # asyncio.run(test_session_factory())
+    # asyncio.run(test_orm_get_and_add())
+    asyncio.run(test_orm_delete_and_update())
