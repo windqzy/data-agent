@@ -1,0 +1,93 @@
+对！Python 中，实例对象也可以像函数一样被调用，前提是这个类实现了 `__call__()` 方法。
+
+### 一、先看一个简单例子
+
+```
+class Dog:    def __call__(self):        print("汪汪！")dog = Dog()   # 创建 Dog 实例dog()         # 像函数一样调用实例
+```
+
+输出：
+
+```
+汪汪！
+```
+
+为什么 `dog()` 能执行？
+
+因为 Python 实际上会调用这个实例所属类的 `__call__()` 方法。
+
+```
+Dog 类
+  │
+  └── __call__() 方法
+          │
+          ▼
+     dog = Dog()
+          │
+          ▼
+       dog()
+          │
+          ▼
+     执行 __call__()
+```
+
+### 二、再看你的 async_sessionmaker
+
+```
+session_factory = async_sessionmaker(    bind=engine,    autoflush=False)
+```
+
+这里的 `session_factory` 是一个工厂实例对象，不是普通函数。
+
+但是 `async_sessionmaker` 类实现了 `__call__()`。
+
+因此：
+
+```
+session = session_factory()
+```
+
+就能创建一个新的 `AsyncSession`。
+
+```
+async_sessionmaker 类
+        │
+        ▼
+session_factory = async_sessionmaker(...)
+        │
+        │ 保存 Engine、autoflush 等配置
+        ▼
+session_factory()
+        │
+        │ 触发 __call__()
+        ▼
+创建新的 AsyncSession 实例
+```
+
+### 三、注意区分两个括号
+
+```
+factory = async_sessionmaker(bind=engine)session = factory()
+```
+
+第一个括号：
+
+`async_sessionmaker(...)` → 创建工厂实例
+
+第二个括号：
+
+`factory()` → 调用工厂实例，创建 Session
+
+这就是 Python 的 可调用对象（Callable Object）。
+
+你可以通过下面的代码验证：
+
+```
+print(type(factory))print(callable(factory))   # Trueprint(type(factory()))
+```
+
+一句话理解：Python 的 `()` 不仅能调用函数，还能调用实现了 `__call__` 的实例对象。
+
+所以你的 Session 工厂，本质上就是一个“能够被当作函数使用的对象”。
+
+async_sessionmaker() 是花钱买一台配置好的“咖啡机”；()（调用 __call__）是按下咖啡机上的“出水按钮”，出来的咖啡才是真正的 Session。
