@@ -29,7 +29,7 @@ db_dw:
 # qdrant的配置
 qdrant:
   host: localhost
-  port: 6333
+  port: 6335
   embedding_size: 1024
 
 # embedding的配置
