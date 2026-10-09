@@ -1,0 +1,248 @@
+PUT /my_index
+Python / Kibana 发送创建索引请求
+             │
+             ▼
+      Elasticsearch
+             │
+             ├── ① 检查索引配置
+             │
+             ├── ② 更新集群元数据
+             │       │
+             │       └── acknowledged = true
+             │
+             ├── ③ 分配并启动分片
+             │       │
+             │       └── shards_acknowledged = true
+             │
+             ▼
+        返回创建结果
+
+
+GET /my_index
+my_index（索引）
+│
+├── aliases（别名）
+│    └── {}                  没有别名
+│
+├── mappings（字段映射）
+│    └── {}                  没有显式定义字段结构
+│
+└── settings（索引设置）
+     │
+     └── index
+          ├── routing         分片分配规则
+          ├── number_of_shards: 1
+          │                    1个主分片
+          │
+          ├── number_of_replicas: 1
+          │                    每个主分片1个副本
+          │
+          ├── provided_name   创建时指定的索引名
+          ├── creation_date   创建时间戳
+          ├── uuid            索引唯一标识
+          └── version         创建索引的ES版本信息
+
+my_index
+   │
+   └── Primary Shard 0
+          │
+          ├── 文档1
+          ├── 文档2
+          └── 文档3
+
+my_index
+│
+├── Primary Shard 0（主分片）
+│    └── Node A
+│
+└── Replica Shard 0（副本分片）
+     └── Node B
+
+Elasticsearch Cluster（集群）
+    │
+    └── Node（节点）
+          │
+          └── Shard（分片）
+                │
+                └── Document（文档my_index（索引）
+
+
+
+POST /my_index/_doc/2
+{
+  "title": "华为电脑",
+  "category": "电脑",
+  "images": "http://www.gulixueyuan.com/xm.jpg",
+  "price": 5000
+}
+
+
+
+GET /my_index/_doc/2
+my_index（索引）
+│
+└── Document（文档）
+     │
+     ├── _id: 2             文档唯一标识
+     ├── _version: 2        当前文档版本
+     ├── _seq_no: 2         主分片操作序列号
+     ├── _primary_term: 1   主分片任期
+     ├── found: true        找到了文档
+     │
+     └── _source           实际业务数据
+          ├── title: 华为电脑
+          ├── category: 电脑
+          ├── images: 图片地址
+          └── price: 5000
+
+
+Elasticsearch
+│
+└── my_index（索引）
+     │
+     ├── mappings（字段说明书）
+     │    │
+     │    ├── title
+     │    │    ├── text
+     │    │    └── IK 中文分词
+     │    │
+     │    ├── category
+     │    │    └── keyword（整体匹配）
+     │    │
+     │    ├── images
+     │    │    └── keyword（不建立搜索索引）
+     │    │
+     │    └── price
+     │         └── integer（整数）
+     │
+     └── documents（实际文档）
+          ├── 商品1
+          ├── 商品2
+          └── 商品3
+
+
+
+
+
+POST _analyze
+{
+    "analyzer":"standard",
+    "text":"我们都是中国人"
+}
+
+POST _analyze
+{
+    "analyzer":"ik_smart",
+    "text":"我们都是中国人"
+}
+
+
+POST _analyze
+{
+    "analyzer":"ik_max_word",
+    "text":"我们都是中国人"
+}
+
+PUT /my_index
+
+GET /my_index
+
+DELETE /my_index
+
+GET /_cat/indices?v
+
+
+PUT /my_index/_doc/1
+{
+  "title": "小米手机",
+  "category": "手机",
+  "images": "http://www.gulixueyuan.com/xm.jpg",
+  "price": 3999
+}
+
+POST /my_index/_doc/2
+{
+  "title": "华为电脑",
+  "category": "电脑",
+  "images": "http://www.gulixueyuan.com/xm.jpg",
+  "price": 5000
+}
+
+GET /my_index/_doc/1
+
+
+
+GET /my_index/_doc/2
+
+
+GET /my_index/_search
+
+
+POST /my_index/_update/1
+{
+  "doc": {
+    "price": 4500
+  }
+}
+
+
+PUT /_bulk
+{ "update": { "_index": "my_index", "_id": "1" } }
+{ "doc": { "price": 3899, "title": "小米手机3 升级版22" } }
+{ "update": { "_index": "my_index", "_id": "2" } }
+{ "doc": { "price": 2999, "title": "小米手机2222" } }
+
+
+DELETE /my_index/_doc/1
+
+
+GET /my_index/_mapping
+
+
+
+#删除原创建的索引
+DELETE /my_index
+
+#创建索引，并同时指定映射关系和分词器等。
+PUT /my_index
+{
+  "mappings": {
+    "properties": {
+      "title": {
+        "type": "text",
+        "index": true,
+        "analyzer": "ik_max_word"
+      },
+      "category": {
+        "type": "keyword",
+        "index": true
+      },
+      "images": {
+        "type": "keyword",
+        "index": false
+      },
+      "price": {
+        "type": "integer",
+        "index": true
+      }
+    }
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
