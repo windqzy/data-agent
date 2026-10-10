@@ -16,7 +16,7 @@ db_meta:
   port: 3307
   user: atguigu
   password: Atguigu.123
-  database: meta
+  database: meta2
 
 # 数据库dw的配置
 db_dw:
@@ -24,7 +24,7 @@ db_dw:
   port: 3307
   user: atguigu
   password: Atguigu.123
-  database: dw
+  database: dw2
 
 # qdrant的配置
 qdrant:
