@@ -76,60 +76,61 @@ compiled_graph = state_graph.compile()
 print(compiled_graph.get_graph().draw_ascii())
 
 if __name__ == '__main__':
-    if __name__ == '__main__':
-        # 运行
-        async def test():
+    # 运行
+    async def test():
 
-            # 初始化所有的客户端
-            dw_mysql_client_manager.init_client()
-            meta_mysql_client_manager.init_client()
-            es_client_manager.init_client()
-            qdrant_client_manager.init_client()
-            embedding_client_manager.init_client()
+        # 初始化所有的客户端
+        dw_mysql_client_manager.init_client()
+        meta_mysql_client_manager.init_client()
+        es_client_manager.init_client()
+        qdrant_client_manager.init_client()
+        embedding_client_manager.init_client()
 
-            try:
-                # 创建session对象
-                assert dw_mysql_client_manager.session_factory
-                async with (
-                    dw_mysql_client_manager.session_factory() as dw_session,
-                    meta_mysql_client_manager.session_factory() as meta_session
+        try:
+            # 创建session对象
+            assert dw_mysql_client_manager.session_factory
+            async with (
+                dw_mysql_client_manager.session_factory() as dw_session,
+                meta_mysql_client_manager.session_factory() as meta_session
+            ):
+                meta_session: AsyncSession
+                # 创建state对象
+                """
+                - 华北地区销售总额
+                - 2025年各地区平均销售额
+                - 各个地区iPhone去年卖了多少钱
+                """
+                # state = DataAgentState(query="各个地区iPhone去年卖了多少钱", fail_count=0)
+                # state = DataAgentState(query="2025年各地区平均销售额", fail_count=0)
+                state = DataAgentState(query="华北地区销售总额", fail_count=0)
+                # 创建context对象
+                context = DataAgentContext(
+                    dw_mysql_repo=DWMysqlRepository(dw_session),
+                    meta_mysql_repo=MetaMysqlRepository(meta_session),
+                    value_es_repo=ValueESRepository(es_client_manager.client),
+                    column_qdrant_repo=ColumnQdrantRepository(qdrant_client_manager.client),
+                    metric_qdrant_repo=MetricQdrantRepository(qdrant_client_manager.client),
+                    embedding_client=embedding_client_manager.client
+                )
+
+                # 运行图，输出自定义数据
+                async for chunk in compiled_graph.astream(
+                        input=state,
+                        context=context,
+                        stream_mode="custom"
                 ):
-                    meta_session: AsyncSession
-                    # 创建state对象
-                    """
-                    - 华北地区销售总额
-                    - 2025年各地区平均销售额
-                    - 各个地区iPhone去年卖了多少钱
-                    """
-                    state = DataAgentState(query="各个地区iPhone去年卖了多少钱", fail_count=0)
-                    # 创建context对象
-                    context = DataAgentContext(
-                        dw_mysql_repo=DWMysqlRepository(dw_session),
-                        meta_mysql_repo=MetaMysqlRepository(meta_session),
-                        value_es_repo=ValueESRepository(es_client_manager.client),
-                        column_qdrant_repo=ColumnQdrantRepository(qdrant_client_manager.client),
-                        metric_qdrant_repo=MetricQdrantRepository(qdrant_client_manager.client),
-                        embedding_client=embedding_client_manager.client
-                    )
+                    print("----", chunk)
+        except Exception as e:
+            # 如果业务失败，回滚事务
+            logger.error(f"查询失败: {str(e)}")
 
-                    # 运行图，输出自定义数据
-                    async for chunk in compiled_graph.astream(
-                            input=state,
-                            context=context,
-                            stream_mode="custom"
-                    ):
-                        print("----", chunk)
-            except Exception as e:
-                # 如果业务失败，回滚事务
-                logger.error(f"查询失败: {str(e)}")
-
-                raise  # 显示最完整的错误信息
-            finally:
-                # 无论成功还是失败最终都要关闭客户端
-                await dw_mysql_client_manager.close_client()
-                await meta_mysql_client_manager.close_client()
-                await es_client_manager.close_client()
-                await qdrant_client_manager.close_client()
+            raise  # 显示最完整的错误信息
+        finally:
+            # 无论成功还是失败最终都要关闭客户端
+            await dw_mysql_client_manager.close_client()
+            await meta_mysql_client_manager.close_client()
+            await es_client_manager.close_client()
+            await qdrant_client_manager.close_client()
 
 
-        asyncio.run(test())
+    asyncio.run(test())
