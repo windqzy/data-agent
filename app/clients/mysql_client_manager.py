@@ -71,7 +71,7 @@ if __name__ == '__main__':
                 result.all() 返回[row,row] 
                 Row对象是包含当前行的字段值的可遍历的对象
                 result.mappings().all() 返回[rowMapping,rowMapping] 
-                Row对象是包含当前行的字段名和字段值的可遍历的对象
+                rowMapping对象是包含当前行的字段名和字段值的可遍历的对象
                 result.scalars().all() 返回[val,val] 
                 val是查询的第一列的字段值
             """

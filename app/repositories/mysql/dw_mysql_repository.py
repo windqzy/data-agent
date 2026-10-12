@@ -53,3 +53,7 @@ class DWMysqlRepository:
     async def validate_sql(self, sql: str):
         await self.session.execute(text(f'explain {sql}'))
 
+    #执行sql，返回数据列表
+    async def execute_sql(self, sql: str)->list[Any]:
+        result = await self.session.execute(text(sql))
+        return result.mappings().all() #[rowMapping,rowMapping]
