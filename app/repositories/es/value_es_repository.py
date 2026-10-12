@@ -67,3 +67,18 @@ class ValueESRepository:
 
         # 它不是把尚未保存的数据写入磁盘，而是让已经写入 Elasticsearch 的文档变得可以被搜索。
         await client.indices.refresh(index=index_name)
+
+    async def search(self, keyword: str) -> list[ValueInfoES]:
+        result = await self.client.search(
+            index=self.index_name,
+            query={
+                "match": {
+                    "value": keyword
+                }
+            },
+        )
+        # print(result)
+        # print(result["hits"]["hits"][0]["_source"])
+
+        # 读取文档数据并整理成目标结构返回
+        return [ValueInfoES(**item["_source"]) for item in result["hits"]["hits"]]
