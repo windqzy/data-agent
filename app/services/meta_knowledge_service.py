@@ -4,6 +4,7 @@ from langchain_huggingface import HuggingFaceEndpointEmbeddings
 
 from app.conf.meta_config import meta_config, TableConfig, MetricConfig
 from app.core.log import logger
+from app.models.es.value_info_es import ValueInfoES
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.column_metric_mysql import ColumnMetricMySQL
 from app.models.mysql.metric_info_mysql import MetricInfoMySQL
@@ -77,7 +78,7 @@ class MetaKnowledgeService:
             # 查询当前表
             for column in table.columns:
                 # 查询当前字段的前十个值
-                examples: list[Any] = await self.dw_mysql_repository.get_column_examples(table.name, column.name)
+                examples: list[Any] = await self.dw_mysql_repository.get_column_values(table.name, column.name)
                 column_infos.append(ColumnInfoMySQL(
                     id=f'{table.name}.{column.name}',
                     name=column.name,
@@ -94,12 +95,36 @@ class MetaKnowledgeService:
         self.meta_mysql_repository.save_column_infos(column_infos)
         return column_infos
 
-
     async def _save_column_infos_to_qdrant(self, column_infos):
         pass
 
-    async def _save_column_value_infos_to_es(self, column_infos, tables):
-        pass
+    async def _save_column_value_infos_to_es(self, column_infos: list[ColumnInfoMySQL], tables: list[TableConfig]):
+        # 从tables中取出所有字段的sync值 dict[column_id,sync]
+        column_sync_dict: dict[str, bool] = {}
+        for table in tables:
+            for column in table.columns:
+                column_sync_dict[f'{table.name}.{column.name}'] = column.sync
+        # 遍历column_infos中收集字段值信息列表
+        value_infos: list[ValueInfoES] = []
+        for column_info in column_infos:
+            # 查询当前字段的所有值
+            values: list = await self.dw_mysql_repository.get_column_values(column_info.table_id, column_info.name,
+                                                                            limit=10000)
+            # 如果当前字段是需要进行ES索引的
+            if column_sync_dict.get(column_info.id):
+                # 对每个字段值创建valueinfo对象添加到列表中
+                for value in values:
+                    value_infos.append(ValueInfoES(
+                        id=f'{column_info.id}.{value}',
+                        value=value,
+                        type=column_info.type,
+                        column_id=column_info.id,
+                        column_name=column_info.name,
+                        table_id=column_info.table_id,
+                        table_name=column_info.table_id
+                    ))
+        # 将字段值信息列表保存到ES库中
+        await self.value_es_repository.insert_value_infos(value_infos)
 
     async def _save_metric_infos_to_meta(self, metrics: list[MetricConfig]) -> list[MetricInfoMySQL]:
         # 1.遍历metrics来手机指标信息列表和字段指标信息列表
