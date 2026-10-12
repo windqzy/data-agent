@@ -10,7 +10,11 @@ async def validate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
     runtime.stream_writer('校验sql')
     # 校验sql处理
     try:
-        return {}
+        sql = state['sql']
+        dw_mysql_repository = runtime.context['dw_mysql_repository']
+        await dw_mysql_repository.validate_sql(sql)
+        logger.info("校验SQL完成")
+        return {'error': None}  # 会自动进行执行sql节点
     except Exception as e:
         logger.error(f'校验sql失败：str(e)')
-        raise
+        return {'error': f'校验sql失败：{str(e)}'}  # 会自动进行校正节点

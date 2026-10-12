@@ -48,3 +48,8 @@ class DWMysqlRepository:
             'version': version,
             'dialect': dialect
         }
+
+    #检查sql是否语法正确
+    async def validate_sql(self, sql: str):
+        await self.session.execute(text(f'explain {sql}'))
+
