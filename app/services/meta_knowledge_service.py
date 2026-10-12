@@ -1,3 +1,4 @@
+import uuid
 from typing import Any
 
 from langchain_huggingface import HuggingFaceEndpointEmbeddings
@@ -9,6 +10,8 @@ from app.models.mysql.column_info_mysql import ColumnInfoMySQL
 from app.models.mysql.column_metric_mysql import ColumnMetricMySQL
 from app.models.mysql.metric_info_mysql import MetricInfoMySQL
 from app.models.mysql.table_info_mysql import TableInfoMySQL
+from app.models.qdrant.column_info_qdrant import ColumnInfoQdrant
+from app.models.qdrant.metric_info_qdrant import MetricInfoQdrant
 from app.repositories.es.value_es_repository import ValueESRepository
 from app.repositories.mysql.dw_mysql_repository import DWMysqlRepository
 from app.repositories.mysql.meta_mysql_repository import MetaMysqlRepository
@@ -95,8 +98,146 @@ class MetaKnowledgeService:
         self.meta_mysql_repository.save_column_infos(column_infos)
         return column_infos
 
-    async def _save_column_infos_to_qdrant(self, column_infos):
-        pass
+    async def _save_column_infos_to_qdrant(self, column_infos: list[ColumnInfoMySQL]):
+        # 遍历column_infos收集生成ids pyloads texts(name/description/alia)
+        # 先收集生成一个list[dict(id/payload/text)]
+        temp_list: list[dict] = []
+        for column_info in column_infos:
+            payload = ColumnInfoQdrant(
+                id=column_info.id,
+                name=column_info.name,
+                type=column_info.type,
+                role=column_info.role,
+                examples=column_info.examples,
+                description=column_info.description,
+                alias=column_info.alias,
+                table_id=column_info.table_id
+            )
+            # name
+            temp_list.append({
+                'id': uuid.uuid4(),
+                'text': column_info.name,
+                'payload': payload
+            })
+
+            # description
+            temp_list.append({
+                'id': uuid.uuid4(),
+                'text': column_info.description,
+                'payload': payload
+            })
+
+            # alias中的每个alia
+            for alia in column_info.alias:
+                temp_list.append({
+                    'id': uuid.uuid4(),
+                    'text': alia,
+                    'payload': payload
+                })
+
+        ids: list[str] = [item['id'] for item in temp_list]
+        payloads: list[str] = [item['payload'] for item in temp_list]
+        texts: list[str] = [item['text'] for item in temp_list]
+        # 对texts进行批量生成向量=>vectors
+        batch_size = 16
+        vectors: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            batch_vectors: list[list[float]] = await self.embedding_client.aembed_documents(batch_texts)
+            vectors.extend(batch_vectors)
+
+        # 调用持久层保存字段信息列表ids payloads vectors
+        await self.column_qdrant_repository.insert_column_vectors(ids, payloads, vectors)
+
+    """
+        我们只看一个字段，你就明白了。
+        
+        假设 MySQL 有一个字段叫 `customer_name`（客户姓名）。
+        
+        ### 第一步：原始数据
+        
+        ```
+        column_info = {    "name": "customer_name",    "description": "客户姓名",    "alias": ["顾客名字", "用户姓名"]}
+        ```
+        
+        ### 第二步：拆成4条数据
+        
+        你的代码会执行：
+        
+        ```
+        一个字段：customer_name
+               │
+               ├── customer_name → UUID1
+               ├── 客户姓名       → UUID2
+               ├── 顾客名字       → UUID3
+               └── 用户姓名       → UUID4
+        ```
+        
+        为什么拆成4条？因为用户可能用这4种不同的说法来表达同一个字段。
+        
+        ### 第三步：把这4句话分别变成向量
+        
+        ```
+        customer_name → [0.12, 0.33, ...] → UUID1
+        客户姓名       → [0.21, 0.56, ...] → UUID2
+        顾客名字       → [0.19, 0.51, ...] → UUID3
+        用户姓名       → [0.23, 0.48, ...] → UUID4
+        ```
+        
+        每个向量都是1024维。
+        
+        但是，这4条记录的 `payload` 都是：
+        
+        ```
+        {    "name": "customer_name",    "description": "客户姓名",    "alias": ["顾客名字", "用户姓名"]}
+        ```
+        
+        ### 第四步：存进 Qdrant
+        
+        | ID    | 向量来自哪段文字      | Payload 指向    |
+        | ----- | ------------- | ------------- |
+        | UUID1 | customer_name | customer_name |
+        | UUID2 | 客户姓名          | customer_name |
+        | UUID3 | 顾客名字          | customer_name |
+        | UUID4 | 用户姓名          | customer_name |
+        
+        ### 第五步：用户真正来查询了
+        
+        用户问：
+        
+        “帮我查一下用户姓名。”
+        
+        ```
+        用户输入："用户姓名"
+               │
+               ▼
+        Embedding 模型
+               │
+               ▼
+        生成查询向量
+               │
+               ▼
+        Qdrant 相似度搜索
+               │
+               ▼
+        命中 UUID4（用户姓名）
+               │
+               ▼
+        读取 Payload
+               │
+               ▼
+        找到真实数据库字段：
+        customer_name
+        ```
+        
+        这样大模型就知道，用户嘴里的“用户姓名”，对应数据库里的 `customer_name`。
+        
+        最关键的一句话：
+        
+        4种不同叫法 → 4个不同向量 → 4个不同ID → 但都指向同一个数据库字段。
+        
+        你这段代码做的就是提前建立这份“语义词典”，让后续的 NL2SQL 能听懂用户的不同表达。
+    """
 
     async def _save_column_value_infos_to_es(self, column_infos: list[ColumnInfoMySQL], tables: list[TableConfig]):
         # 从tables中取出所有字段的sync值 dict[column_id,sync]
@@ -164,4 +305,49 @@ class MetaKnowledgeService:
         """
 
     async def _save_metric_infos_to_qdrant(self, metrics_infos: list[MetricInfoMySQL]):
-        pass
+        # 遍历metrics_infos收集生成ids pyloads texts(name/description/alia)
+        # 先收集生成一个list[dict(id/payload/text)]
+        temp_list: list[dict] = []
+        for metric_info in metrics_infos:
+            payload = MetricInfoQdrant(
+                id=metric_info.id,
+                name=metric_info.name,
+                description=metric_info.description,
+                alias=metric_info.alias,
+                relevant_columns=metric_info.relevant_columns
+            )
+            # name
+            temp_list.append({
+                'id': uuid.uuid4(),
+                'text': metric_info.name,
+                'payload': payload
+            })
+
+            # description
+            temp_list.append({
+                'id': uuid.uuid4(),
+                'text': metric_info.description,
+                'payload': payload
+            })
+
+            # alias中的每个alia
+            for alia in metric_info.alias:
+                temp_list.append({
+                    'id': uuid.uuid4(),
+                    'text': alia,
+                    'payload': payload
+                })
+
+        ids: list[str] = [item['id'] for item in temp_list]
+        payloads: list[str] = [item['payload'] for item in temp_list]
+        texts: list[str] = [item['text'] for item in temp_list]
+        # 对texts进行批量生成向量=>vectors
+        batch_size = 16
+        vectors: list[list[float]] = []
+        for i in range(0, len(texts), batch_size):
+            batch_texts = texts[i:i + batch_size]
+            batch_vectors: list[list[float]] = await self.embedding_client.aembed_documents(batch_texts)
+            vectors.extend(batch_vectors)
+
+        # 调用持久层保存字段信息列表ids payloads vectors
+        await self.metric_qdrant_repository.insert_column_vectors(ids, payloads, vectors)
