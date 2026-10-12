@@ -105,12 +105,16 @@ if __name__ == '__main__':
                 state = DataAgentState(query="华北地区销售总额", fail_count=0)
                 # 创建context对象
                 context = DataAgentContext(
-                    dw_mysql_repo=DWMysqlRepository(dw_session),
-                    meta_mysql_repo=MetaMysqlRepository(meta_session),
-                    value_es_repo=ValueESRepository(es_client_manager.client),
-                    column_qdrant_repo=ColumnQdrantRepository(qdrant_client_manager.client),
-                    metric_qdrant_repo=MetricQdrantRepository(qdrant_client_manager.client),
-                    embedding_client=embedding_client_manager.client
+                    dw_mysql_repository=DWMysqlRepository(dw_session),
+                    meta_mysql_repository=MetaMysqlRepository(meta_session),
+                    value_es_repository=ValueESRepository(es_client_manager.client),
+                    column_qdrant_repository=ColumnQdrantRepository(
+                        qdrant_client_manager.client
+                    ),
+                    metric_qdrant_repository=MetricQdrantRepository(
+                        qdrant_client_manager.client
+                    ),
+                    embedding_client=embedding_client_manager.client,
                 )
 
                 # 运行图，输出自定义数据
