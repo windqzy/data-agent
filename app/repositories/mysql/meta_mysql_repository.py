@@ -1,3 +1,4 @@
+from sqlalchemy import Select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.mysql.column_info_mysql import ColumnInfoMySQL
@@ -29,3 +30,16 @@ class MetaMysqlRepository:
     # 向column_metric表中添加多条件数据
     def save_column_metrics(self, column_metrics: list[ColumnMetricMySQL]):
         self.session.add_all(column_metrics)
+
+    # 根据字段id查询字段信息
+    async def get_column_info_by_id(self, column_id: str) -> ColumnInfoMySQL:
+        return await self.session.get(ColumnInfoMySQL, column_id)
+
+    # 查询指定表的主键和外键字段信息列表
+    async def get_key_column_infos(self, table_id: str) -> list[ColumnInfoMySQL]:
+        result = await self.session.execute(Select(ColumnInfoMySQL).where(ColumnInfoMySQL.table_id == table_id)
+                                            .where(ColumnInfoMySQL.role.in_(['primary_key', 'foreign_key'])))
+        return result.scalars().all()
+
+    async def get_table_info_by_id(self, table_id:str) -> TableInfoMySQL:
+        return await self.session.get(TableInfoMySQL, table_id)
