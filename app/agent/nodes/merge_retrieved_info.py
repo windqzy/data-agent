@@ -43,7 +43,7 @@ def _convert_metric_info_qdrant_to_state(recall_metric:MetricInfoQdrant):
 
 async def merge_retrieved_info(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('合并召回')
+    runtime.stream_writer({'stage':'合并召回'})
     # 合并召回处理
     try:
         recall_columns = state['recall_columns']

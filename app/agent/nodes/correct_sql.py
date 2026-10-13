@@ -14,7 +14,7 @@ MAX_FAIL_COUNT = 5
 
 async def correct_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('校正sql')
+    runtime.stream_writer({'stage':'校正sql'})
     # 校正sql处理
     try:
         query = state['query']

@@ -19,7 +19,7 @@ from app.prompt.prompt_loader import load_prompt
 
 async def recall_column(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('召回字段')
+    runtime.stream_writer({'stage':'召回字段'})
     # 召回字段处理
     try:
         query = state['query']

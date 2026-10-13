@@ -8,7 +8,7 @@ from app.core.log import logger
 
 async def extract_keywords(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('提取关键词')
+    runtime.stream_writer({'stage':'提取关键词'})
     # 提取关键词处理
     try:
         query = state['query']

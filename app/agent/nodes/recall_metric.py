@@ -19,7 +19,7 @@ from app.prompt.prompt_loader import load_prompt
 
 async def recall_metric(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('召回指标')
+    runtime.stream_writer({'stage':'召回指标'})
     # 召回字段处理
     try:
         query = state['query']

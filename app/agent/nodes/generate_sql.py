@@ -12,7 +12,7 @@ from app.prompt.prompt_loader import load_prompt
 
 async def generate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('生成sql')
+    runtime.stream_writer({'stage':'生成sql'})
     # 生成sql处理
     try:
         query = state['query']

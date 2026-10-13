@@ -8,7 +8,7 @@ from app.core.log import logger
 
 async def validate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('校验sql')
+    runtime.stream_writer({'stage':'校验sql'})
     # 检查是否已经达到最大失败次数
     fail_count = state['fail_count']
     # 校验sql处理

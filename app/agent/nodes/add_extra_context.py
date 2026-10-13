@@ -10,7 +10,7 @@ from app.core.log import logger
 
 async def add_extra_context(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('添加额外信息')
+    runtime.stream_writer({'stage':'添加额外信息'})
     # 添加额外信息处理
     try:
         dw_mysql_repository = runtime.context['dw_mysql_repository']

@@ -18,7 +18,7 @@ from app.prompt.prompt_loader import load_prompt
 
 async def filter_table(state: DataAgentState, runtime: Runtime[DataAgentContext]):
     # 自定义输出
-    runtime.stream_writer('过滤表和字段')
+    runtime.stream_writer({'stage':'过滤表和字段'})
     # 过滤表和字段处理
     try:
         query = state['query']
@@ -62,24 +62,40 @@ async def filter_table(state: DataAgentState, runtime: Runtime[DataAgentContext]
 
 
 """
-遍历的副本 b = a[:]       被修改的原列表 a
+拷贝的容器存储的是同一批对象的引用（地址），迭代器遍历的是新容器中的位置。
+看这个内存结构：
+code
+Code
+原列表 A                      浅拷贝列表 B
+地址：0x100                   地址：0x200
 
-下标 0 → A ────────────► A
-下标 1 → B ────────────► B
-下标 2 → C ────────────► C
-下标 3 → D ────────────► D
+下标0 → 地址0xA ──┐     下标0 → 地址0xA ──┐
+下标1 → 地址0xB ──┤     下标1 → 地址0xB ──┤
+下标2 → 地址0xC ──┤     下标2 → 地址0xC ──┤
+                  │                       │
+                  ▼                       ▼
+             共享同一批对象
+                A、B、C
+假设执行：
+code
+Code
+for item in a[:]:    a.remove(item)
+实际过程：
+code
+Code
+① 迭代器读取副本下标0 → 对象A
+   原列表删除A → [B, C]
+   副本不变   → [A, B, C]
 
-遍历 b 的 A → 删除 a 的 A
+② 迭代器读取副本下标1 → 对象B
+   原列表删除B → [C]
+   副本不变   → [A, B, C]
 
-副本 b                     原列表 a
-[A, B, C, D]               [B, C, D]
-    ↑
-下一次继续遍历 B
-
-遍历 b 的 B → 删除 a 的 B
-
-副本 b                     原列表 a
-[A, B, C, D]               [C, D]
-       ↑
-继续遍历 C
+③ 迭代器读取副本下标2 → 对象C
+   原列表删除C → []
+所以关键是：
+迭代器按照副本的下标依次取出对象引用，而删除操作改变的是原列表中的引用排列。
+对象本身没有因为 remove() 被移动到另一个内存地址；移动的是原列表中保存引用的位置。
+你可以记成：
+浅拷贝 = 新容器 + 旧对象引用。
 """
