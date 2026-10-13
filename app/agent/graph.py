@@ -67,7 +67,7 @@ state_graph.add_edge("generate_sql", "validate_sql")
 state_graph.add_conditional_edges("validate_sql",
                                   lambda state: "execute_sql" if state.get('error') is None else "correct_sql",
                                   {"execute_sql": "execute_sql", "correct_sql": "correct_sql"})
-state_graph.add_edge("correct_sql", "execute_sql")
+state_graph.add_edge("correct_sql", "validate_sql")
 state_graph.add_edge("execute_sql", END)
 # 编译图--获取全局graph对象
 compiled_graph = state_graph.compile()

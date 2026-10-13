@@ -19,11 +19,11 @@ async def validate_sql(state: DataAgentState, runtime: Runtime[DataAgentContext]
         dw_mysql_repository = runtime.context['dw_mysql_repository']
         await dw_mysql_repository.validate_sql(sql)
 
-        # 模拟sql校验失败
-        # raise Exception('SQL语法可能有问题！')
+        # 模拟SQL校验失败
+        raise Exception("SQL语法可能有问题")
 
-        # logger.info("校验SQL完成")
-        # return {'error': None}  # 会自动进行执行sql节点
+        logger.info("校验SQL完成")
+        return {'error': None}  # 会自动进行执行sql节点
     except Exception as e:
         if fail_count == MAX_FAIL_COUNT:
             raise e
