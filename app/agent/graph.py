@@ -101,8 +101,8 @@ if __name__ == '__main__':
                 - 各个地区iPhone去年卖了多少钱
                 """
                 # state = DataAgentState(query="各个地区iPhone去年卖了多少钱", fail_count=0)
-                # state = DataAgentState(query="2025年各地区平均销售额", fail_count=0)
-                state = DataAgentState(query="华北地区销售总额", fail_count=0)
+                state = DataAgentState(query="2025年各地区平均销售额", fail_count=0)
+                # state = DataAgentState(query="华北地区销售总额", fail_count=0)
                 # 创建context对象
                 context = DataAgentContext(
                     dw_mysql_repository=DWMysqlRepository(dw_session),
