@@ -59,12 +59,19 @@ async def merge_retrieved_info(state: DataAgentState, runtime: Runtime[DataAgent
                 # 查询column_id对应的字段信息
                 column_info_mysql: ColumnInfoMySQL = await meta_mysql_repository.get_column_info_by_id(column_id)
                 column_infos_dict[column_id] = _convert_column_info_mysql_to_qdrant(column_info_mysql)
+
         # 1.3 继续收集字段值信息列表对应的字段信息列表 将字段值保存到字段的值的样例列表中
         for recall_value in recall_values:
             column_id = recall_value['column_id']
             # 查询column_id对应的字段信息
             column_info_mysql: ColumnInfoMySQL = await meta_mysql_repository.get_column_info_by_id(column_id)
             column_infos_dict[column_info_mysql.id] = _convert_column_info_mysql_to_qdrant(column_info_mysql)
+
+            #将样例值添加到到字段的examples中去 
+            value = recall_value['value']
+            examples = column_infos_dict[column_id]['examples']
+            if value not in examples:
+                examples.append(value)
 
         # 2. 根据收集的所有字段信息列表 生成带字段信息列表的表信息列表
         # 2.1 对收集的字段信息列表进行按表id进行分组：dict[table_id,list[ColumnInfoQdrant]]
